@@ -1,7 +1,14 @@
 #!/bin/bash
 set -x
 
+# Remove MySQL Lock file if the app was forcefully closed.
+rm -fr /var/run/mysqld/mysqld.sock.lock
+
 if [ ! -f /etc/nc_installed ]; then
+    if [ -f /home/appbox/public_html/config/config.php ]; then
+        mv /home/appbox/public_html/config/config.php /home/appbox/logs/config.php
+    fi
+
     # Install & Configure LEMP Stack
     /bin/sh /scripts/lemp.sh
 
@@ -35,22 +42,6 @@ env[TEMP] = /tmp" >> /home/appbox/config/php-fpm/pool.d/www.conf
     rm -f nextcloud.zip
     rm -fr nextcloud/
 
-    if [ -f /storage/admin/files/nextcloud.sql ]; then
-        echo "MySQL Backup Detected.. Restoring.."
-        /usr/bin/mysqld_safe &
-        sleep 10
-        mysql -uroot -p${MYSQL_ROOT_PASSWORD} ${DB_NAME} < /storage/admin/files/nextcloud.sql
-        rm -f /storage/admin/files/nextcloud.sql
-        pkill -9 mysql
-
-        mv /storage/admin/files/config.php /home/appbox/public_html/config/config.php
-
-echo "
-\$CONFIG['dbuser'] = 'root';
-\$CONFIG['dbpassword'] = 'mysqlr00t';
-" >> /home/appbox/public_html/config/config.php
-
-    else
 echo "<?php
 \$AUTOCONFIG = array(
   'dbtype'        => 'mysql',
@@ -63,7 +54,6 @@ echo "<?php
   'adminpass'     => '${ADMIN_PASS}',
   'directory'     => '/storage',
 );" > /home/appbox/public_html/config/autoconfig.php
-    fi
 
     if [ ! -f /storage/.ocdata ]; then
         touch /storage/.ocdata
@@ -76,6 +66,27 @@ echo "<?php
 
     chmod -R 0770 /storage
     chown -R appbox:appbox /storage
+
+    #This is an upgrade...
+    if [ -f /home/appbox/logs/config.php ]; then
+        /usr/sbin/mysqld --verbose=0 --socket=/run/mysqld/mysqld.sock &
+        sleep 10
+
+        mv /home/appbox/logs/config.php /home/appbox/public_html/config/config.php
+        chown -R appbox:appbox /home/appbox/public_html/config/config.php
+        sed -i "s/throw new \\\Exception('Updates between multiple major versions and downgrades are unsupported.');/# throw new \\\Exception('Updates between multiple major versions and downgrades are unsupported.');/g" /home/appbox/public_html/lib/private/Updater.php
+        touch /etc/nc_installed
+
+        exec su -c "cd /home/appbox/public_html; php occ upgrade; touch /home/appbox/public_html/finished-upgrade" -s /bin/sh appbox &
+        while [ ! -f /home/appbox/public_html/finished-upgrade ]
+        do
+          sleep 5
+          echo "Waiting for upgrade to finish"
+        done
+
+        pkill -9 mysql
+        rm -fr /run/mysqld/mysqld.sock
+    fi
 
     # Finish Installation
     curl -i -H "Accept: application/json" -H "Content-Type:application/json" -X POST "https://api.cylo.io/v1/apps/installed/$INSTANCE_ID"

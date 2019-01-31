@@ -8,7 +8,7 @@ ENV MYSQL_ROOT_PASS=mysqlr00t
 ENV DB_NAME=nextlcloud
 
 # Nextcloud Environment variables
-ENV NEXTCLOUD_VER="13.0.4"
+ENV NEXTCLOUD_VER="15.0.2"
 ENV ADMIN_USER=admin
 ENV ADMIN_PASS=Letmein123
 
