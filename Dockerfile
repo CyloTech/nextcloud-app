@@ -5,7 +5,7 @@ ENV START_SUPERVISOR=false
 
 # Declare Environment variables required by the parent:
 ENV MYSQL_ROOT_PASS=mysqlr00t
-ENV DB_NAME=nextlcloud
+ENV DB_NAME=nextcloud
 
 # Nextcloud Environment variables
 ENV NEXTCLOUD_VER="15.0.2"
