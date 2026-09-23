@@ -32,9 +32,15 @@ docker run --rm --entrypoint /bin/bash "$image_ref" -ec '
 '
 
 docker run -d --name "$test_name" --hostname "$test_name" \
-    --memory 4g --memory-swap 4g \
+    --memory 4g --memory-swap 4g --tmpfs /ssl \
     -e "HOSTNAME=$test_name" -e APP_APEX_CALLBACK=false \
     "$image_ref" >/dev/null
+
+# Appbox supplies these files as a mount. Use a short-lived synthetic
+# certificate in the disposable container so nginx can validate both sites.
+docker exec "$test_name" openssl req -x509 -newkey rsa:2048 -nodes \
+    -keyout /ssl/key.pem -out /ssl/cert.pem \
+    -subj "/CN=$test_name" -days 1 >/dev/null 2>&1
 
 wait_for_install() {
     local attempt
