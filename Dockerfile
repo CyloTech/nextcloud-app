@@ -92,6 +92,7 @@ RUN groupmod -g 9999 nogroup && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY --chmod=0755 ./scripts/15_mysql_config_compat.sh /etc/my_init.d/15_mysql_config_compat.sh
+COPY --chmod=0755 ./scripts/25_nginx_site_compat.sh /etc/my_init.d/25_nginx_site_compat.sh
 
 EXPOSE 80
 
