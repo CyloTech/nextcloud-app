@@ -58,7 +58,23 @@ wait_for_install() {
     return 1
 }
 
+wait_for_health() {
+    local attempt
+    for attempt in $(seq 1 60); do
+        if docker exec "$test_name" /bin/bash -ec '
+            curl -fsS --max-time 10 http://localhost/status.php | grep -q "35.0.0"
+            su -s /bin/sh -c "cd /home/appbox/public_html && php occ status --output=json" appbox | grep -q "\"installed\":true"
+        ' >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 5
+    done
+    echo 'Nextcloud did not become healthy within 5 minutes after installer completion.' >&2
+    return 1
+}
+
 wait_for_install
+wait_for_health
 docker exec "$test_name" /bin/bash -ec '
     [ "$(php -r "echo ini_get(\"memory_limit\");")" = 3G ]
     grep -q php-fpm8.3 /etc/service/phpfpm/run
@@ -70,6 +86,7 @@ docker exec "$test_name" /bin/bash -ec '
 
 docker restart "$test_name" >/dev/null
 wait_for_install
+wait_for_health
 docker exec "$test_name" /bin/bash -ec '
     curl -fsS http://localhost/status.php | grep -q "35.0.0"
     [ "$(php -r "echo ini_get(\"memory_limit\");")" = 3G ]
