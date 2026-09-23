@@ -85,6 +85,11 @@ docker exec "$test_name" /bin/bash -ec '
 '
 
 docker restart "$test_name" >/dev/null
+# Docker clears tmpfs contents on restart; Appbox's real /ssl mount persists.
+# Restore the test certificate before checking nginx after the restart.
+docker exec "$test_name" openssl req -x509 -newkey rsa:2048 -nodes \
+    -keyout /ssl/key.pem -out /ssl/cert.pem \
+    -subj "/CN=$test_name" -days 1 >/dev/null 2>&1
 wait_for_install
 wait_for_health
 docker exec "$test_name" /bin/bash -ec '
