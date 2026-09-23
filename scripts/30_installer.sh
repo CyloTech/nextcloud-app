@@ -153,7 +153,7 @@ env[TEMP] = /tmp" >> /home/appbox/config/php-fpm/pool.d/www.conf
     # download app (skip if installed version is already higher)
     if [ "$SKIP_UPGRADE" = false ]; then
         cd /home/appbox/public_html
-        cd /app-sources && sha256sum -c nextcloud-"${NEXTCLOUD_VER}".zip.sha256 || exit 1
+        /app-sources/verify-nextcloud-archive.sh "$NEXTCLOUD_VER" || exit 1
         cd /home/appbox/public_html
         unzip -o /app-sources/nextcloud-"${NEXTCLOUD_VER}".zip || exit 1
         cp -R nextcloud/* .

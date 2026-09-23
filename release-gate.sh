@@ -25,7 +25,7 @@ docker run --rm --entrypoint /bin/bash "$image_ref" -ec '
     [ "$(php -r "echo ini_get(\"memory_limit\");")" = 3G ]
     [ "$(php-fpm8.3 -i 2>/dev/null | sed -n "s/^memory_limit => \([^ ]*\) =>.*/\1/p" | head -n 1)" = 3G ]
     test -f /app-sources/nextcloud-35.0.0.zip
-    cd /app-sources && sha256sum -c nextcloud-35.0.0.zip.sha256
+    /app-sources/verify-nextcloud-archive.sh 35.0.0
     php -m | grep -Eq "^(apcu|APCu)$"
     php -m | grep -q pdo_mysql
     php -m | grep -q imagick

@@ -43,6 +43,7 @@ ENV APP_APEX_CALLBACK=true
 # Add installer and source files
 ADD ./scripts/10_upgrade_preflight.sh /etc/my_init.d/10_upgrade_preflight.sh
 ADD ./scripts/30_installer.sh /etc/my_init.d/30_installer.sh
+COPY --chmod=0755 ./scripts/verify-nextcloud-archive.sh /app-sources/verify-nextcloud-archive.sh
 ADD ./sources/* /app-sources/
 
 # Verify the release archive once at build time; customer startup uses the
@@ -50,9 +51,8 @@ ADD ./sources/* /app-sources/
 RUN set -eux; \
     curl -fsSL https://download.nextcloud.com/server/releases/nextcloud-35.0.0.zip -o /app-sources/nextcloud-35.0.0.zip; \
     curl -fsSL https://download.nextcloud.com/server/releases/nextcloud-35.0.0.zip.sha256 -o /app-sources/nextcloud-35.0.0.zip.sha256; \
-    cd /app-sources; \
-    sha256sum -c nextcloud-35.0.0.zip.sha256; \
-    unzip -tq nextcloud-35.0.0.zip >/dev/null
+    /app-sources/verify-nextcloud-archive.sh 35.0.0; \
+    unzip -tq /app-sources/nextcloud-35.0.0.zip >/dev/null
 
 COPY ./sources/sshd_config /etc/ssh/sshd_config
 
