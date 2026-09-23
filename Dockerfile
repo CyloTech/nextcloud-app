@@ -2,12 +2,11 @@ FROM repo.cylo.net/baseimage@sha256:14cefc412bab9e3bba6bed680ec8f9bfc204bd75a3c9
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# PHP 8.4 supports both the existing Nextcloud 31 release and Nextcloud 35.
+# PHP 8.3 supports both the existing Nextcloud 31 release and Nextcloud 35.
 # Nextcloud 35 requires MySQL 8.4 or newer. Retain the existing data volume.
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates curl gnupg software-properties-common; \
-    add-apt-repository -y ppa:ondrej/php; \
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg; \
     curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor -o /usr/share/keyrings/nginx-archive-keyring.gpg; \
     echo 'deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/ubuntu noble nginx' > /etc/apt/sources.list.d/nginx.list; \
     echo -e 'Package: *\nPin: origin nginx.org\nPin-Priority: 900' > /etc/apt/preferences.d/99nginx; \
@@ -16,17 +15,17 @@ RUN set -eux; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       nginx mysql-server unzip \
-      php8.4-fpm php8.4-cli php8.4-curl php8.4-gd php8.4-xml \
-      php8.4-mbstring php8.4-zip php8.4-intl php8.4-mysql \
-      php8.4-apcu php8.4-redis php8.4-imagick php8.4-bcmath \
-      php8.4-gmp php8.4-bz2 php8.4-ldap php8.4-smbclient; \
-    update-alternatives --set php /usr/bin/php8.4; \
+      php8.3-fpm php8.3-cli php8.3-curl php8.3-gd php8.3-xml \
+      php8.3-mbstring php8.3-zip php8.3-intl php8.3-mysql \
+      php8.3-apcu php8.3-redis php8.3-imagick php8.3-bcmath \
+      php8.3-gmp php8.3-bz2 php8.3-ldap; \
+    update-alternatives --set php /usr/bin/php8.3; \
     grep -q 'php-fpm8.3' /scripts/nginx_php7.sh; \
-    sed -i 's/php-fpm8\.3/php-fpm8.4/g; s@/etc/php/8\.3/@/etc/php/8.4/@g; s/memory_limit = 2G/memory_limit = 3G/' /scripts/nginx_php7.sh; \
+    sed -i 's/memory_limit = 2G/memory_limit = 3G/' /scripts/nginx_php7.sh; \
     grep -q 'apt install -y mysql-server php-mysql' /scripts/mysql.sh; \
-    sed -i 's/apt install -y mysql-server php-mysql/apt install -y mysql-server php8.4-mysql/' /scripts/mysql.sh; \
-    printf 'memory_limit = 3G\n' > /etc/php/8.4/fpm/conf.d/99-nextcloud-memory.ini; \
-    printf 'memory_limit = 3G\n' > /etc/php/8.4/cli/conf.d/99-nextcloud-memory.ini; \
+    sed -i 's/apt install -y mysql-server php-mysql/apt install -y mysql-server php8.3-mysql/' /scripts/mysql.sh; \
+    printf 'memory_limit = 3G\n' > /etc/php/8.3/fpm/conf.d/99-nextcloud-memory.ini; \
+    printf 'memory_limit = 3G\n' > /etc/php/8.3/cli/conf.d/99-nextcloud-memory.ini; \
     apt-get clean; rm -rf /var/lib/apt/lists/*
 
 ENV DB_NAME=nextcloud
@@ -82,7 +81,10 @@ RUN groupmod -g 9999 nogroup && \
                    librsvg2-dev \
                    openssh-server \
                    rar && \
-    echo "apc.enable_cli=1" >> /etc/php/8.4/cli/conf.d/20-apcu.ini && \
+    printf 'no\n' | pecl install smbclient && \
+    echo 'extension=smbclient.so' > /etc/php/8.3/fpm/conf.d/20-smbclient.ini && \
+    echo 'extension=smbclient.so' > /etc/php/8.3/cli/conf.d/20-smbclient.ini && \
+    echo "apc.enable_cli=1" >> /etc/php/8.3/cli/conf.d/20-apcu.ini && \
     \
     mkdir -p /etc/my_init.d && \
     chmod +x /etc/my_init.d/10_upgrade_preflight.sh /etc/my_init.d/30_installer.sh && \

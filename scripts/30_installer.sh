@@ -42,13 +42,13 @@ rm -fr /var/run/mysqld/mysqld.sock.lock
 
 # These files can survive an image change in the Appbox home volume. Keep the
 # active FPM service, nginx socket, and both PHP SAPIs on the same release.
-printf 'memory_limit = 3G\n' > /etc/php/8.4/fpm/conf.d/99-nextcloud-memory.ini
-printf 'memory_limit = 3G\n' > /etc/php/8.4/cli/conf.d/99-nextcloud-memory.ini
+printf 'memory_limit = 3G\n' > /etc/php/8.3/fpm/conf.d/99-nextcloud-memory.ini
+printf 'memory_limit = 3G\n' > /etc/php/8.3/cli/conf.d/99-nextcloud-memory.ini
 if [ -f /etc/service/phpfpm/run ]; then
-    sed -i 's/php-fpm8\.[23]/php-fpm8.4/g' /etc/service/phpfpm/run
+    sed -i 's/php-fpm8\.[23]/php-fpm8.3/g' /etc/service/phpfpm/run
 fi
 if [ -f /home/appbox/config/nginx/sites-enabled/nextcloud.conf ]; then
-    sed -i 's/php8\.[23]-fpm.sock/php8.4-fpm.sock/g' /home/appbox/config/nginx/sites-enabled/nextcloud.conf
+    sed -i 's/php8\.[23]-fpm.sock/php8.3-fpm.sock/g' /home/appbox/config/nginx/sites-enabled/nextcloud.conf
 fi
 
 if [ ! -f /etc/app_installer_completed ]; then
@@ -89,7 +89,7 @@ opcache.save_comments=1
 opcache.revalidate_freq=1
 upload_max_filesize=100G
 post_max_size=100G
-max_execution_time=3600" > /etc/php/8.4/fpm/conf.d/40-nextcloud.ini
+max_execution_time=3600" > /etc/php/8.3/fpm/conf.d/40-nextcloud.ini
 
 echo "env[HOSTNAME] = $HOSTNAME
 env[PATH] = /usr/local/bin:/usr/bin:/bin
@@ -187,7 +187,7 @@ echo "<?php
     if [[ $UPGRADE == "true" ]] && [[ $SKIP_UPGRADE == "false" ]]; then
         /usr/sbin/mysqld --defaults-file=/home/appbox/config/mysql/mysqld.cnf --verbose=0 --socket=/run/mysqld/mysqld.sock &
         /usr/sbin/nginx -c /home/appbox/config/nginx/nginx.conf -g "daemon off;" &
-        /usr/sbin/php-fpm8.4 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf &
+        /usr/sbin/php-fpm8.3 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf &
         sleep 10
 
         while ! (mysqladmin --socket=/run/mysqld/mysqld.sock ping)
@@ -220,7 +220,7 @@ echo "<?php
     else
         /usr/sbin/mysqld --defaults-file=/home/appbox/config/mysql/mysqld.cnf --verbose=0 --socket=/run/mysqld/mysqld.sock &
         /usr/sbin/nginx -c /home/appbox/config/nginx/nginx.conf -g "daemon off;" &
-        /usr/sbin/php-fpm8.4 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf &
+        /usr/sbin/php-fpm8.3 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf &
         sleep 10
 
         while ! (mysqladmin --socket=/run/mysqld/mysqld.sock ping)
@@ -252,7 +252,7 @@ fi
 
 /usr/sbin/mysqld --defaults-file=/home/appbox/config/mysql/mysqld.cnf --verbose=0 --socket=/run/mysqld/mysqld.sock &
 /usr/sbin/nginx -c /home/appbox/config/nginx/nginx.conf -g "daemon off;" &
-        /usr/sbin/php-fpm8.4 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf &
+        /usr/sbin/php-fpm8.3 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf &
 sleep 10
 
 while ! (mysqladmin --socket=/run/mysqld/mysqld.sock ping)
@@ -355,7 +355,7 @@ touch /etc/app_installer_completed
 # ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 #
 # If high memory or segfault:
-# echo "apc.enable_cli=1" >> /etc/php/8.4/cli/conf.d/20-apcu.ini
+# echo "apc.enable_cli=1" >> /etc/php/8.3/cli/conf.d/20-apcu.ini
 # If end up in an upgrade loop
 # delete affected apps from /home/appbox/public_html/apps/
 # and restore from a fresh unzipped nextcloud.zip
