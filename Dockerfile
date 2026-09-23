@@ -42,7 +42,6 @@ ENV APP_APEX_CALLBACK=true
 
 # Add installer and source files
 ADD ./scripts/10_upgrade_preflight.sh /etc/my_init.d/10_upgrade_preflight.sh
-ADD ./scripts/15_mysql_config_compat.sh /etc/my_init.d/15_mysql_config_compat.sh
 ADD ./scripts/30_installer.sh /etc/my_init.d/30_installer.sh
 COPY --chmod=0755 ./scripts/verify-nextcloud-archive.sh /app-sources/verify-nextcloud-archive.sh
 ADD ./sources/* /app-sources/
@@ -88,9 +87,11 @@ RUN groupmod -g 9999 nogroup && \
     echo "apc.enable_cli=1" >> /etc/php/8.3/cli/conf.d/20-apcu.ini && \
     \
     mkdir -p /etc/my_init.d && \
-    chmod +x /etc/my_init.d/10_upgrade_preflight.sh /etc/my_init.d/15_mysql_config_compat.sh /etc/my_init.d/30_installer.sh && \
+    chmod +x /etc/my_init.d/10_upgrade_preflight.sh /etc/my_init.d/30_installer.sh && \
     apt autoremove -y && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY --chmod=0755 ./scripts/15_mysql_config_compat.sh /etc/my_init.d/15_mysql_config_compat.sh
 
 EXPOSE 80
 
