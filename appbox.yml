@@ -1,0 +1,33 @@
+app:
+  display_name: Nextcloud
+  publisher: Nextcloud
+  description: Nextcloud is a self-hosted collaboration platform for file sync and sharing.
+
+image:
+  name: repo.cylo.net/nextcloud
+  version: 35.0.0-2
+  tag: 35.0.0-2
+  digest: repo.cylo.net/nextcloud@sha256:e840fc9dcf952c7555872534c2c12e7cea16cd00e556be542e570ea400ae3b2e
+
+container:
+  memory: 4
+  memory_swap: 4
+  memory_reservation: 3
+  cpus: 0
+  init: true
+
+networking:
+  is_web_app: true
+  subdomain: nextcloud
+
+ports:
+  combined:
+    range: '22'
+
+behavior:
+  app_slots: 1
+  expect_callback: true
+  callback_requires_auth: false
+  can_update: false
+  allow_downgrade: false
+  ssl_restart: true
