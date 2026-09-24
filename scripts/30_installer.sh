@@ -215,7 +215,7 @@ echo "<?php
         fi
 
         # Make sure config.php exists
-        until curl -i -L http://"$HOSTNAME":80/index.php | grep -q '200'; do
+        until curl -fsSL --connect-timeout 5 --max-time 30 -o /dev/null "http://$HOSTNAME:80/index.php"; do
             printf '.'
             sleep 1
         done
@@ -242,7 +242,7 @@ echo "<?php
             echo "waiting for mysql ..."
         done
 
-        until curl -i -L http://"$HOSTNAME":80/index.php | grep -q '200'; do
+        until curl -fsSL --connect-timeout 5 --max-time 30 -o /dev/null "http://$HOSTNAME:80/index.php"; do
             printf '.'
             sleep 1
         done
@@ -274,7 +274,7 @@ do
     echo "waiting for mysql ..."
 done
 
-until curl -i -L http://"$HOSTNAME":80/index.php | grep -q '200'; do
+until curl -fsSL --connect-timeout 5 --max-time 30 -o /dev/null "http://$HOSTNAME:80/index.php"; do
     printf '.'
     sleep 1
 done
