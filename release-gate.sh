@@ -88,14 +88,16 @@ docker exec "$test_name" /bin/bash -ec '
 # Confirm a Nextcloud .user.ini override cannot lower the web PHP limit.
 docker exec "$test_name" /bin/bash -ec '
     cp /home/appbox/public_html/.user.ini /tmp/cylo-user.ini.backup
+    cp /home/appbox/public_html/status.php /tmp/cylo-status.php.backup
     printf "\nmemory_limit=128M\n" >> /home/appbox/public_html/.user.ini
-    printf "<?php echo ini_get(\"memory_limit\");\n" > /home/appbox/public_html/cylo-memory-probe.php
-    chown appbox:appbox /home/appbox/public_html/cylo-memory-probe.php
-    test "$(curl -fsS http://localhost/cylo-memory-probe.php)" = 3G
-    rm /home/appbox/public_html/cylo-memory-probe.php
+    printf "<?php echo ini_get(\"memory_limit\");\n" > /home/appbox/public_html/status.php
+    chown appbox:appbox /home/appbox/public_html/status.php
+    sv restart phpfpm
+    test "$(curl -fsS http://localhost/status.php)" = 3G
+    cp /tmp/cylo-status.php.backup /home/appbox/public_html/status.php
     cp /tmp/cylo-user.ini.backup /home/appbox/public_html/.user.ini
-    chown appbox:appbox /home/appbox/public_html/.user.ini
-    rm /tmp/cylo-user.ini.backup
+    chown appbox:appbox /home/appbox/public_html/status.php /home/appbox/public_html/.user.ini
+    rm /tmp/cylo-status.php.backup /tmp/cylo-user.ini.backup
 '
 
 docker restart "$test_name" >/dev/null
