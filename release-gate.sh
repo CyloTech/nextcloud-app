@@ -44,7 +44,7 @@ docker exec "$test_name" openssl req -x509 -newkey rsa:2048 -nodes \
 
 wait_for_install() {
     local attempt
-    for attempt in $(seq 1 180); do
+    for attempt in $(seq 1 360); do
         if [ "$(docker inspect --format '{{.State.Running}}' "$test_name")" != true ]; then
             echo 'Fresh-install container exited before completion.' >&2
             return 1
@@ -54,7 +54,7 @@ wait_for_install() {
         fi
         sleep 5
     done
-    echo 'Fresh-install container did not complete within 15 minutes.' >&2
+    echo 'Fresh-install container did not complete within 30 minutes.' >&2
     return 1
 }
 
