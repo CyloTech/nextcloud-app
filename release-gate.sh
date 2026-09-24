@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-expected_ref=repo.cylo.net/nextcloud:35.0.0-1
+expected_ref=repo.cylo.net/nextcloud:35.0.0-2
 if [ "$#" -ne 1 ] || [ "$1" != "$expected_ref" ]; then
     echo "Usage: $0 $expected_ref" >&2
     exit 2
@@ -79,9 +79,23 @@ docker exec "$test_name" /bin/bash -ec '
     [ "$(php -r "echo ini_get(\"memory_limit\");")" = 3G ]
     grep -q php-fpm8.3 /etc/service/phpfpm/run
     grep -q php8.3-fpm.sock /home/appbox/config/nginx/sites-enabled/nextcloud.conf
+    php-fpm8.3 -tt --fpm-config /home/appbox/config/php-fpm/php-fpm.conf 2>&1 | grep -F "php_admin_value[memory_limit] = 3G" >/dev/null
     nginx -t -c /home/appbox/config/nginx/nginx.conf
     curl -fsS http://localhost/status.php | grep -q "35.0.0"
     su -s /bin/sh -c "cd /home/appbox/public_html && php occ status --output=json" appbox | grep -q "\"installed\":true"
+'
+
+# Confirm a Nextcloud .user.ini override cannot lower the web PHP limit.
+docker exec "$test_name" /bin/bash -ec '
+    cp /home/appbox/public_html/.user.ini /tmp/cylo-user.ini.backup
+    printf "\nmemory_limit=128M\n" >> /home/appbox/public_html/.user.ini
+    printf "<?php echo ini_get(\"memory_limit\");\n" > /home/appbox/public_html/cylo-memory-probe.php
+    chown appbox:appbox /home/appbox/public_html/cylo-memory-probe.php
+    test "$(curl -fsS http://localhost/cylo-memory-probe.php)" = 3G
+    rm /home/appbox/public_html/cylo-memory-probe.php
+    cp /tmp/cylo-user.ini.backup /home/appbox/public_html/.user.ini
+    chown appbox:appbox /home/appbox/public_html/.user.ini
+    rm /tmp/cylo-user.ini.backup
 '
 
 docker restart "$test_name" >/dev/null
@@ -95,6 +109,7 @@ wait_for_health
 docker exec "$test_name" /bin/bash -ec '
     curl -fsS http://localhost/status.php | grep -q "35.0.0"
     [ "$(php -r "echo ini_get(\"memory_limit\");")" = 3G ]
+    php-fpm8.3 -tt --fpm-config /home/appbox/config/php-fpm/php-fpm.conf 2>&1 | grep -F "php_admin_value[memory_limit] = 3G" >/dev/null
 '
 
 set +e

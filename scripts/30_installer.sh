@@ -44,6 +44,19 @@ rm -fr /var/run/mysqld/mysqld.sock.lock
 # active FPM service, nginx socket, and both PHP SAPIs on the same release.
 printf 'memory_limit = 3G\n' > /etc/php/8.3/fpm/conf.d/99-nextcloud-memory.ini
 printf 'memory_limit = 3G\n' > /etc/php/8.3/cli/conf.d/99-nextcloud-memory.ini
+pool_config=/home/appbox/config/php-fpm/pool.d/www.conf
+if [ ! -f "$pool_config" ]; then
+    echo 'PHP-FPM pool configuration is missing.' >&2
+    exit 1
+fi
+# Nextcloud ships a .user.ini that can lower the ordinary FPM ini setting.
+# A pool admin value keeps the image's 3G limit effective on every boot.
+sed -i '/^[[:space:]]*php_admin_value\[memory_limit\][[:space:]]*=/d' "$pool_config"
+printf '\nphp_admin_value[memory_limit] = 3G\n' >> "$pool_config"
+if ! /usr/sbin/php-fpm8.3 -t --fpm-config /home/appbox/config/php-fpm/php-fpm.conf; then
+    echo 'PHP-FPM pool configuration is invalid.' >&2
+    exit 1
+fi
 if [ -f /etc/service/phpfpm/run ]; then
     sed -i 's/php-fpm8\.[23]/php-fpm8.3/g' /etc/service/phpfpm/run
 fi
