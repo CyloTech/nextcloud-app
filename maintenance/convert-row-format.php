@@ -33,7 +33,7 @@ if (!isset($CONFIG) || !is_array($CONFIG)) {
 
 if (($CONFIG['dbname'] ?? '') !== 'nextcloud'
     || ($CONFIG['dbtableprefix'] ?? '') !== 'nc_'
-    || !in_array($CONFIG['dbhost'] ?? '', ['localhost', '127.0.0.1'], true)) {
+    || ($CONFIG['dbhost'] ?? '') !== 'localhost:3306') {
     fwrite(STDERR, "Unexpected database or table prefix.\n");
     exit(1);
 }

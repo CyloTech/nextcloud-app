@@ -11,7 +11,7 @@ require '/home/appbox/public_html/config/config.php';
 if (!isset($CONFIG) || !is_array($CONFIG)
     || ($CONFIG['dbname'] ?? '') !== 'nextcloud'
     || ($CONFIG['dbtableprefix'] ?? '') !== 'nc_'
-    || !in_array($CONFIG['dbhost'] ?? '', ['localhost', '127.0.0.1'], true)) {
+    || ($CONFIG['dbhost'] ?? '') !== 'localhost:3306') {
     fwrite(STDERR, "Unexpected Nextcloud database configuration.\n");
     exit(1);
 }
@@ -22,7 +22,8 @@ $command = [
     '--quick',
     '--skip-lock-tables',
     '--no-tablespaces',
-    '--host=' . $CONFIG['dbhost'],
+    '--host=localhost',
+    '--port=3306',
     '--user=' . $CONFIG['dbuser'],
     '--',
     'nextcloud',
