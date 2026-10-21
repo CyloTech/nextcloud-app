@@ -24,9 +24,15 @@ trial_ref=local/nextcloud-trial:35.0.0-3
 context_path=.
 min_arg=PHP83_MIN_VERSION
 gate=release-gate.sh
-builder=appbox@builder.grant.appboxes.co
-ssh_opts=(-i /Users/rid/.ssh/appbox_ubuntuvps2_webtop -o IdentitiesOnly=yes -o BatchMode=yes
-    -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30)
+builder=appbox@builder1.builder.appboxes.co
+builder_port=10112
+control_dir=$(mktemp -d /private/tmp/cylo-ssh.XXXXXX)
+# One multiplexed connection for every ssh/scp call keeps the number of new
+# connections to the builder low.
+ssh_opts=(-o "Port=$builder_port" -i /Users/rid/.ssh/appbox_ubuntuvps2_webtop -o IdentitiesOnly=yes
+    -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30
+    -o ControlMaster=auto -o "ControlPath=$control_dir/%C" -o ControlPersist=300)
+poll_seconds=30
 
 fail() {
     echo "FAIL: $*" >&2
@@ -61,14 +67,22 @@ echo "commit $commit ($branch), context '$context_path', mode $mode"
 stage=$(mktemp -d /private/tmp/cylo-app-build.XXXXXX)
 remote_prefix="/home/appbox/builds/$repo_slug.$image_tag"
 remote_dir=""
+job_started=0
+job_finished=0
 cleanup() {
     case "$stage" in /private/tmp/cylo-app-build.??????) rm -rf "$stage" ;; esac
     case "$remote_dir" in
         "$remote_prefix".[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]])
-            ssh -p 12246 "${ssh_opts[@]}" "$builder" "rm -rf '$remote_dir'" \
-                || echo "Remove $remote_dir on the builder by hand" >&2
+            if [ "$job_started" -eq 1 ] && [ "$job_finished" -ne 1 ]; then
+                echo "The builder job may still be running; its log is $builder:$remote_dir/build.log. Remove $remote_dir by hand when it has finished." >&2
+            else
+                ssh "${ssh_opts[@]}" "$builder" "rm -rf '$remote_dir'" \
+                    || echo "Remove $remote_dir on the builder by hand" >&2
+            fi
             ;;
     esac
+    ssh "${ssh_opts[@]}" -O exit "$builder" >/dev/null 2>&1 || true
+    case "$control_dir" in /private/tmp/cylo-ssh.??????) rm -rf "$control_dir" ;; esac
 }
 trap cleanup EXIT
 
@@ -82,27 +96,56 @@ tar -tzvf "$archive"
 archive_sha=$(shasum -a 256 "$archive" | awk '{print $1}')
 echo "archive sha256 $archive_sha"
 
-remote_dir=$(ssh -p 12246 "${ssh_opts[@]}" "$builder" "mktemp -d '$remote_prefix.XXXXXX'")
+remote_dir=$(ssh "${ssh_opts[@]}" "$builder" "mktemp -d '$remote_prefix.XXXXXX'")
 case "$remote_dir" in
     "$remote_prefix".[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]]) ;;
     *) remote_dir=""; fail "unexpected remote directory" ;;
 esac
-scp -P 12246 "${ssh_opts[@]}" "$archive" "$builder:$remote_dir/context.tgz"
-ssh -p 12246 "${ssh_opts[@]}" "$builder" "cd '$remote_dir' && \
+echo "builder directory $remote_dir"
+scp "${ssh_opts[@]}" "$archive" "$builder:$remote_dir/context.tgz"
+ssh "${ssh_opts[@]}" "$builder" "cd '$remote_dir' && \
     printf '%s  context.tgz\n' '$archive_sha' | sha256sum -c - && \
     mkdir context && tar xzf context.tgz -C context && test -x 'context/$gate'"
 
 if [ "$mode" = trial ]; then
-    ssh -p 12246 "${ssh_opts[@]}" "$builder" "cd '$remote_dir/context' && \
-        docker build --progress=plain --platform linux/amd64 --no-cache \
-            --build-arg '$min_arg=$trial_min' -t '$trial_ref' . && \
-        './$gate' '$trial_ref'"
+    build_ref=$trial_ref
+    remote_job="cd context && docker build --progress=plain --platform linux/amd64 --no-cache --build-arg '$min_arg=$trial_min' -t '$build_ref' . && './$gate' '$build_ref'"
+else
+    build_ref=$release_ref
+    remote_job="cd context && docker build --progress=plain --platform linux/amd64 --no-cache -t '$build_ref' . && './$gate' '$build_ref' && docker push '$build_ref' && docker image inspect --format '{{json .RepoDigests}}' '$build_ref'"
+fi
+
+# Build, gate and (release mode) push run as one joined command in a detached
+# session on the builder, so a dropped SSH connection cannot interrupt them
+# between the gate and the push. The last log line records the exit status.
+boot_id=$(ssh "${ssh_opts[@]}" "$builder" "cat /proc/sys/kernel/random/boot_id")
+ssh "${ssh_opts[@]}" "$builder" "cd '$remote_dir' && \
+    { nohup setsid bash -c \"$remote_job; echo STAGE-BUILD-EXIT=\\\$?\" > build.log 2>&1 < /dev/null & } && echo 'builder job started'"
+job_started=1
+
+exit_line=""
+while [ -z "$exit_line" ]; do
+    sleep "$poll_seconds"
+    if ! progress=$(ssh "${ssh_opts[@]}" "$builder" "cat /proc/sys/kernel/random/boot_id; tail -n 2 '$remote_dir/build.log'"); then
+        echo "$(date -u +%H:%M:%S) builder unreachable; retrying" >&2
+        continue
+    fi
+    if [ "$(printf '%s\n' "$progress" | head -n 1)" != "$boot_id" ]; then
+        job_finished=1
+        fail "the builder rebooted during the job; nothing was pushed by this run unless its log says so"
+    fi
+    progress=$(printf '%s\n' "$progress" | tail -n +2)
+    echo "$(date -u +%H:%M:%S) $(printf '%s' "$progress" | tail -n 1 | cut -c1-200)"
+    exit_line=$(printf '%s\n' "$progress" | sed -n 's/^STAGE-BUILD-EXIT=\([0-9][0-9]*\)$/\1/p')
+done
+job_finished=1
+
+echo "===== builder log ($remote_dir/build.log)"
+ssh "${ssh_opts[@]}" "$builder" "cat '$remote_dir/build.log'"
+echo "===== end of builder log"
+[ "$exit_line" -eq 0 ] || fail "builder job exited with status $exit_line"
+if [ "$mode" = trial ]; then
     echo "Trial finished: $trial_ref (not pushed) from $commit"
 else
-    ssh -p 12246 "${ssh_opts[@]}" "$builder" "cd '$remote_dir/context' && \
-        docker build --progress=plain --platform linux/amd64 --no-cache -t '$release_ref' . && \
-        './$gate' '$release_ref' && \
-        docker push '$release_ref' && \
-        docker image inspect --format '{{json .RepoDigests}}' '$release_ref'"
     echo "Pushed $release_ref from $commit; record the digest above"
 fi

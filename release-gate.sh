@@ -193,6 +193,29 @@ docker exec "$test_name" /bin/bash -ec '
     rm /tmp/cylo-status.php.backup /tmp/cylo-user.ini.backup
 '
 
+# A multipart upload through the installed nginx site and php-fpm8.3. The
+# container restart below discards the swapped status.php from opcache.
+docker exec "$test_name" /bin/bash -ec '
+    cp /home/appbox/public_html/status.php /tmp/cylo-status.php.backup
+    printf "<?php echo count(\$_FILES), \":\", \$_FILES[\"f\"][\"size\"] ?? -1, \":\", \$_POST[\"a\"] ?? \"\";\n" > /home/appbox/public_html/status.php
+    chown appbox:appbox /home/appbox/public_html/status.php
+    printf hello > /tmp/cylo-upload.txt
+    sv restart phpfpm >/dev/null
+    result=
+    for attempt in $(seq 1 20); do
+        result=$(curl -sS --max-time 10 -F a=b -F f=@/tmp/cylo-upload.txt http://localhost/status.php) && [ "$result" = 1:5:b ] && break
+        sleep 1
+    done
+    cp /tmp/cylo-status.php.backup /home/appbox/public_html/status.php
+    chown appbox:appbox /home/appbox/public_html/status.php
+    rm /tmp/cylo-status.php.backup /tmp/cylo-upload.txt
+    if [ "$result" != 1:5:b ]; then
+        echo "multipart upload through nginx and php-fpm8.3 returned \"$result\", expected 1:5:b" >&2
+        exit 1
+    fi
+    echo "multipart upload parsed through the installed nginx site and php-fpm8.3"
+'
+
 docker restart "$test_name" >/dev/null
 # Docker clears tmpfs contents on restart; Appbox's real /ssl mount persists.
 # Restore the test certificate before checking nginx after the restart.
