@@ -20,7 +20,8 @@
 # identical non-php8.1 packages, the same set of php8.1 packages, identical
 # installer, /app-sources, PHP, nginx and service files apart from the added
 # version-pin script, and identical CLI and FPM module lists. It also runs
-# php-fpm8.1 -t, a multipart upload, the version-pin cases, and a my_init run
+# php-fpm8.1 -t, nginx -t, a multipart upload (CLI server, and a PHP page plus
+# upload served through nginx and php-fpm8.1), the version-pin cases, and a my_init run
 # that proves the pinned version reaches 30_installer.sh.
 set -euo pipefail
 
@@ -159,13 +160,19 @@ diff -u <(docker run --rm --network none --entrypoint "$php_cli" "$base_ref" -m)
     || fail "$php_cli module list differs from the deployed base"
 echo "CLI and FPM module lists identical"
 
-echo "== FPM configuration"
+echo "== FPM and nginx configuration"
 docker run --rm --network none --entrypoint "$php_fpm" "$image_ref" -t \
     || fail "$php_fpm configuration test failed"
+docker run --rm --network none --entrypoint nginx "$image_ref" -t \
+    || fail "nginx configuration test failed"
 
 echo "== Multipart upload"
 in_image "$image_ref" /release/multipart-smoke.sh "$php_cli" \
     || fail "multipart upload smoke test failed"
+
+echo "== PHP page and multipart upload through nginx and $php_fpm"
+in_image "$image_ref" /release/fpm-smoke.sh "$php_fpm" \
+    || fail "nginx and $php_fpm smoke test failed"
 
 echo "== Version pin cases"
 # $1: installed $OC_VersionString value, or 'none' for no version.php
