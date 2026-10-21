@@ -18,7 +18,9 @@
 # runtime configuration (env including NEXTCLOUD_VER, command, ports, user),
 # identical non-php8.3 packages, the same set of php8.3 packages, identical
 # installer, /app-sources, PHP, nginx and service files, and identical CLI and
-# FPM module lists. It also runs php-fpm8.3 -t and a multipart upload.
+# FPM module lists. It also runs php-fpm8.3 -t, nginx -t, a multipart upload
+# with the CLI server, and a PHP page plus multipart upload served through
+# nginx and php-fpm8.3.
 set -euo pipefail
 
 release_ref=repo.cylo.net/nextcloud:31.0.4-1
@@ -149,13 +151,19 @@ diff -u <(docker run --rm --network none --entrypoint "$php_cli" "$base_ref" -m)
     || fail "$php_cli module list differs from the deployed base"
 echo "CLI and FPM module lists identical"
 
-echo "== FPM configuration"
+echo "== FPM and nginx configuration"
 docker run --rm --network none --entrypoint "$php_fpm" "$image_ref" -t \
     || fail "$php_fpm configuration test failed"
+docker run --rm --network none --entrypoint nginx "$image_ref" -t \
+    || fail "nginx configuration test failed"
 
 echo "== Multipart upload"
 in_image "$image_ref" /release/multipart-smoke.sh "$php_cli" \
     || fail "multipart upload smoke test failed"
+
+echo "== PHP page and multipart upload through nginx and $php_fpm"
+in_image "$image_ref" /release/fpm-smoke.sh "$php_fpm" \
+    || fail "nginx and $php_fpm smoke test failed"
 
 echo "== Registry tag must not exist"
 "$gate_dir/release/registry-absent.sh" "$release_ref" \
