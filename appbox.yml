@@ -5,9 +5,8 @@ app:
 
 image:
   name: repo.cylo.net/nextcloud
-  version: 35.0.0-3
-  tag: 35.0.0-3
-  digest: repo.cylo.net/nextcloud@sha256:79d413a16f82989c7b49fcc28f5d2caedc1c06878deea5098b9f15ce968a3c80
+  version: 35.0.0-4
+  tag: 35.0.0-4
 
 container:
   memory: 4

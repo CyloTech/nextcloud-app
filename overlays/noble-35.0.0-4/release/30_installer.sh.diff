@@ -1,0 +1,39 @@
+--- base/etc/my_init.d/30_installer.sh
++++ image/etc/my_init.d/30_installer.sh
+@@ -78,7 +78,15 @@
+ 
+     if [ -f /home/appbox/public_html/config/config.php ]; then
+         mkdir -p /home/appbox/public_html/config/
+-        mv /home/appbox/public_html/config/config.php /home/appbox/logs/config.php
++        if grep -Eq "^[[:space:]]*'installed'[[:space:]]*=>[[:space:]]*true[[:space:]]*,?[[:space:]]*$" /home/appbox/logs/config.php 2>/dev/null \
++            && ! grep -Eq "^[[:space:]]*'installed'[[:space:]]*=>[[:space:]]*true[[:space:]]*,?[[:space:]]*$" /home/appbox/public_html/config/config.php; then
++            # An earlier start left an empty or not-installed config.php in place
++            # of this installation's saved configuration. Keep the saved one.
++            echo "Keeping the saved Nextcloud configuration in /home/appbox/logs/config.php"
++            mv /home/appbox/public_html/config/config.php /home/appbox/logs/config.php.not-installed."$(date +%Y%m%d%H%M%S)"
++        else
++            mv /home/appbox/public_html/config/config.php /home/appbox/logs/config.php
++        fi
+     fi
+ 
+     ls -la /home/appbox/config
+@@ -196,8 +204,17 @@
+     find /storage -not \( -path */apps/* -prune \) -not \( -path */apps/ -prune \) -exec chmod 0770 {} \;
+     find /storage -not \( -path */apps/* -prune \) -not \( -path */apps/ -prune \) -exec chown appbox:appbox {} \;
+ 
+-    #This is an upgrade... (skip if installed version is already higher)
+-    if [[ $UPGRADE == "true" ]] && [[ $SKIP_UPGRADE == "false" ]]; then
++    #This is an existing installation: an upgrade, or a recreate with the same
++    #Nextcloud version (the download above is skipped if the installed version
++    #is already the same or higher, and occ upgrade then has nothing to do)
++    if [[ $UPGRADE == "true" ]]; then
++        # Put the saved configuration back before nginx and php-fpm start, so
++        # no request can reach the setup page of an installed Nextcloud.
++        if [ -s /home/appbox/logs/config.php ] && [ ! -s /home/appbox/public_html/config/config.php ]; then
++            echo "Restoring the saved Nextcloud configuration"
++            mv /home/appbox/logs/config.php /home/appbox/public_html/config/config.php
++            chown appbox:appbox /home/appbox/public_html/config/config.php
++        fi
+         /usr/sbin/mysqld --defaults-file=/home/appbox/config/mysql/mysqld.cnf --verbose=0 --socket=/run/mysqld/mysqld.sock &
+         /usr/sbin/nginx -c /home/appbox/config/nginx/nginx.conf -g "daemon off;" &
+         /usr/sbin/php-fpm8.3 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf &
