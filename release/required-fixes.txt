@@ -1,0 +1,7 @@
+# CVE ids that must appear in the Debian changelog of the installed
+# php8.3-common package. Release mode of release-gate.sh fails unless the list
+# is non-empty and every id is present; trial mode only reports them.
+# Confirm these against the Ubuntu security notice for php8.3 before releasing,
+# and correct them in the same commit that sets the version pin.
+CVE-2026-109618
+CVE-2026-109619

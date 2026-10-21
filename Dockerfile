@@ -2,9 +2,18 @@ FROM repo.cylo.net/baseimage@sha256:14cefc412bab9e3bba6bed680ec8f9bfc204bd75a3c9
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Release pin: the first Ubuntu noble php8.3 version that contains the fixes
+# from the PHP security release of 21 October 2026 (multipart/form-data
+# parsing). The build fails unless every installed package built from the
+# php8.3 source is at one version that is at least this one, so it cannot
+# succeed before Ubuntu publishes the fix. release-gate.sh reads this line.
+ARG PHP83_MIN_VERSION=8.3.6-0ubuntu0.24.04.13
+LABEL net.cylo.php-min-version="${PHP83_MIN_VERSION}"
+
 # PHP 8.3 supports both the existing Nextcloud 31 release and Nextcloud 35.
 # Nextcloud 35 requires MySQL 8.4 or newer. Retain the existing data volume.
-RUN set -eux; \
+RUN --mount=type=bind,source=release/check-php-packages.sh,target=/tmp/check-php-packages.sh \
+    set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ca-certificates curl gnupg; \
     curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor -o /usr/share/keyrings/nginx-archive-keyring.gpg; \
@@ -26,6 +35,7 @@ RUN set -eux; \
     sed -i 's/apt install -y mysql-server php-mysql/apt install -y mysql-server php8.3-mysql/' /scripts/mysql.sh; \
     printf 'memory_limit = 3G\n' > /etc/php/8.3/fpm/conf.d/99-nextcloud-memory.ini; \
     printf 'memory_limit = 3G\n' > /etc/php/8.3/cli/conf.d/99-nextcloud-memory.ini; \
+    sh /tmp/check-php-packages.sh php8.3 "$PHP83_MIN_VERSION"; \
     apt-get clean; rm -rf /var/lib/apt/lists/*
 
 ENV DB_NAME=nextcloud
@@ -93,6 +103,10 @@ RUN groupmod -g 9999 nogroup && \
 
 COPY --chmod=0755 ./scripts/15_mysql_config_compat.sh /etc/my_init.d/15_mysql_config_compat.sh
 COPY --chmod=0755 ./scripts/25_nginx_site_compat.sh /etc/my_init.d/25_nginx_site_compat.sh
+
+# The later apt run must not have changed the php8.3 packages.
+RUN --mount=type=bind,source=release/check-php-packages.sh,target=/tmp/check-php-packages.sh \
+    sh /tmp/check-php-packages.sh php8.3 "$PHP83_MIN_VERSION"
 
 EXPOSE 80
 
