@@ -1,0 +1,2 @@
+*/15 * * * * /bin/su -s /bin/bash -c "TERM=xterm ps aux | grep 'console.php' | grep -v 'grep' || /usr/bin/php /home/appbox/public_html/cron.php >/dev/null 2>&1" appbox
+*/5 * * * * /bin/su -s /bin/bash -c "TERM=xterm ps aux | grep 'console.php' | grep -v 'grep' || /usr/bin/php /home/appbox/public_html/console.php files:scan --all --unscanned >/dev/null 2>&1" appbox
