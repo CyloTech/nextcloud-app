@@ -1,0 +1,79 @@
+--- base/scripts/nginx_php7.sh
++++ image/scripts/nginx_php7.sh
+@@ -24,7 +24,7 @@
+ 
+ # Set php vars
+ echo "Set php vars"
+-cat << EOF >> /etc/php/8.3/fpm/conf.d/20-docker.ini
++cat << EOF >> /etc/php/8.4/fpm/conf.d/20-docker.ini
+ cgi.fix_pathinfo=0
+ upload_max_filesize = 20G
+ post_max_size = 1G
+@@ -48,7 +48,7 @@
+ mkdir -p /etc/service/phpfpm
+ cat << EOF >> /etc/service/phpfpm/run
+ #!/bin/sh
+-exec /usr/sbin/php-fpm8.3 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf
++exec /usr/sbin/php-fpm8.4 --nodaemonize --fpm-config /home/appbox/config/php-fpm/php-fpm.conf
+ EOF
+ chmod +x /etc/service/phpfpm/run
+ 
+--- base/scripts/mysql.sh
++++ image/scripts/mysql.sh
+@@ -4,7 +4,7 @@
+ echo "**************************************************************"
+ 
+ echo "Installing MySQL"
+-apt update
++true # 35.0.0-5: the packages are installed in the image
+ 
+ echo "Creating directories"
+ mkdir -p /home/appbox/mysql/run
+@@ -74,7 +74,7 @@
+     apt update
+ fi
+ 
+-apt install -y mysql-server php8.3-mysql
++true # 35.0.0-5: the packages are installed in the image
+ 
+ echo "Starting MySQL for the first time"
+ chown -R appbox:appbox /var/run/mysqld /run/mysqld/
+--- base/sources/php-fpm.conf
++++ image/sources/php-fpm.conf
+@@ -14,14 +14,14 @@
+ ; Pid file
+ ; Note: the default prefix is /var
+ ; Default Value: none
+-pid = /run/php/php8.3-fpm.pid
++pid = /run/php/php8.4-fpm.pid
+ 
+ ; Error log file
+ ; If it's set to "syslog", log is sent to syslogd instead of being written
+ ; into a local file.
+ ; Note: the default prefix is /var
+ ; Default Value: log/php-fpm.log
+-error_log = /home/appbox/logs/php8.3-fpm.log
++error_log = /home/appbox/logs/php8.4-fpm.log
+ 
+ ; syslog_facility is used to specify what type of program is logging the
+ ; message. This lets syslogd specify that messages from different facilities
+--- base/sources/www.conf
++++ image/sources/www.conf
+@@ -33,7 +33,7 @@
+ ;                            (IPv6 and IPv4-mapped) on a specific port;
+ ;   '/path/to/unix/socket' - to listen on a unix socket.
+ ; Note: This value is mandatory.
+-listen = /run/php/php8.3-fpm.sock
++listen = /run/php/php8.4-fpm.sock
+ 
+ ; Set listen(2) backlog.
+ ; Default Value: 511 (-1 on FreeBSD and OpenBSD)
+--- base/app-sources/nextcloud.conf
++++ image/app-sources/nextcloud.conf
+@@ -1,5 +1,5 @@
+ upstream php-handler {
+-    server unix:/run/php/php8.3-fpm.sock;
++    server unix:/run/php/php8.4-fpm.sock;
+ }
+ 
+ # Set the `immutable` cache control options only for assets with a cache busting `v` argument

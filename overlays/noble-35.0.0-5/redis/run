@@ -1,0 +1,6 @@
+#!/bin/sh
+# runit service: Redis for Nextcloud file locking and caching, as appbox.
+mkdir -p /run/redis
+chown appbox:appbox /run/redis
+chmod 750 /run/redis
+exec chpst -u appbox:appbox /usr/bin/redis-server /etc/nextcloud-redis.conf
