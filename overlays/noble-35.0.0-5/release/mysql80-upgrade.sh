@@ -17,7 +17,8 @@
 #   kill              stops the container with SIGKILL, so MySQL 8.0 does not
 #                     shut down cleanly (optional, before the recreate)
 #   (recreate-regression.sh <work dir> recreate <new image>)
-#   check-84 <image>  after the update: MySQL 8.4 runs on the upgraded data,
+#   check-84 <image>  after the update: the image's MySQL 8.4 runs on the
+#                     upgraded data,
 #                     the 8.0 copy exists, the Nextcloud database user still
 #                     uses mysql_native_password and works, the PHP version,
 #                     database version, file locking and memcache setup
@@ -143,7 +144,9 @@ kill)
 
 check-84)
     version=$(server_version) || fail "cannot query MySQL after the update"
-    [ "$version" = 8.4.11 ] || fail "MySQL $version runs after the update, expected 8.4.11"
+    expected=$(docker exec "$name" mysqld --version | sed -n 's/.* Ver \(8\.4\.[0-9][0-9]*\) .*/\1/p')
+    [ -n "$expected" ] || fail "the image does not have MySQL 8.4"
+    [ "$version" = "$expected" ] || fail "MySQL $version runs after the update, expected $expected"
     backup=$vol/mysql_data/data.mysql80-backup
     [ -d "$backup" ] || fail "no copy of the MySQL 8.0 data directory in mysql_data/"
     grep -Eq '^8\.0\.' "$backup/mysql_upgrade_info" || fail "the copy is not a MySQL 8.0 data directory"
@@ -163,7 +166,7 @@ check-84)
     docker exec "$name" sv status redis | grep -q '^run: redis' || fail "Redis is not running"
     say "database user $dbuser (mysql_native_password) works; PhpOutdated, SupportedDatabase, FileLocking and MemcacheConfigured pass; test file present"
     echo "MySQL errors and warnings logged since the update:"
-    docker exec "$name" sh -c 'awk "/8\\.4\\.11/ {seen = 1} seen && /\\[(ERROR|Warning)\\]/" /home/appbox/logs/mysql/error.log | sed -E "s/^[^ ]+ //" | cut -c1-200 | sort | uniq -c | sort -rn | head -20' | sed 's/^/    /' || true
+    docker exec -e "CYLO_VERSION=$version" "$name" sh -c 'awk -v v="$CYLO_VERSION" "index(\$0, v) {seen = 1} seen && /\\[(ERROR|Warning)\\]/" /home/appbox/logs/mysql/error.log | sed -E "s/^[^ ]+ //" | cut -c1-200 | sort | uniq -c | sort -rn | head -20' | sed 's/^/    /' || true
     ;;
 
 rollback)

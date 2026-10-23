@@ -242,7 +242,7 @@ docker run --rm --network none --entrypoint /bin/bash "$image_ref" -ec '
     [ "$(readlink -f /usr/bin/php)" = /usr/bin/php8.4 ]
     test ! -e /usr/bin/php8.3 && test ! -e /usr/sbin/php-fpm8.3 && test ! -d /etc/php/8.3
     nginx -v 2>&1 | grep -Eq "nginx/1\.30\."
-    mysqld --version | grep -q " 8\.4\.11 "
+    mysqld --version | grep -Eq " 8\.4\.[0-9]+ "
     [ "$(php -r "echo ini_get(\"memory_limit\");")" = 3G ]
     [ "$(php-fpm8.4 -i 2>/dev/null | sed -n "s/^memory_limit => \([^ ]*\) =>.*/\1/p" | head -n 1)" = 3G ]
     [ "$(php -r "echo ini_get(\"apc.enable_cli\");")" = 1 ]
@@ -255,7 +255,13 @@ docker run --rm --network none --entrypoint /bin/bash "$image_ref" -ec '
     if grep -nE "^apt " /scripts/mysql.sh; then exit 1; fi
     [ -z "$(apt-get -s autoremove 2>/dev/null | grep "^Remv" || true)" ]
 '
-echo "PHP 8.4, nginx 1.30, MySQL 8.4.11, 3G limits, APCu CLI, Imagick SVG, smbclient, phpredis, Redis 7, no runtime apt"
+mysql_min=$(sed -n 's/^ARG MYSQL84_MIN_VERSION=\([A-Za-z0-9.+~-]*\)$/\1/p' "$gate_dir/Dockerfile")
+[ -n "$mysql_min" ] || fail "could not read ARG MYSQL84_MIN_VERSION from $gate_dir/Dockerfile"
+mysql_versions=$(awk -F'|' '$1 ~ /^mysql-/ && $2 ~ /^8\.4\./ {print $2}' "$work/image-dpkg" | sort -u)
+[ "$(printf '%s\n' "$mysql_versions" | grep -c .)" -eq 1 ] || fail "MySQL 8.4 packages are not at one version: $mysql_versions"
+in_image "$image_ref" -c "dpkg --compare-versions '$mysql_versions' ge '$mysql_min'" \
+    || fail "MySQL $mysql_versions is older than the pinned minimum $mysql_min"
+echo "PHP 8.4, nginx 1.30, MySQL $mysql_versions (minimum $mysql_min), 3G limits, APCu CLI, Imagick SVG, smbclient, phpredis, Redis 7, no runtime apt"
 
 echo "== Fresh install and restart"
 docker run -d --name "$test_name" --hostname "$test_name" \
@@ -478,9 +484,11 @@ scenario_mysql80_kill() {
 
 # Each MySQL 8.4 server takes about 14,000 of the host's asynchronous I/O
 # contexts (fs.aio-max-nr is 65536 on builder1), so at most three scenarios
-# run at a time.
+# run at a time and each scenario's container is stopped when it finishes.
 scenarios="same-image from-base from-deployed mysql80 mysql80-kill"
 failed=
+declare -A scenario_dir=([same-image]=$same_dir [from-base]=$base_dir [from-deployed]=$deployed_dir \
+    [mysql80]=$mysql80_dir [mysql80-kill]=$mysql80_kill_dir)
 run_batch() {
     local scenario status
     declare -A scenario_pid
@@ -494,6 +502,10 @@ run_batch() {
         echo "--- $scenario (exit $status)"
         grep -vE '^ *- |^[[:space:]]*$|^ +[0-9]+ \[' "$work/scenario-$scenario.log" | tail -n 60
         [ "$status" -eq 0 ] || failed="$failed $scenario"
+        # A finished scenario's MySQL must not hold I/O contexts the next
+        # batch needs.
+        docker ps -q --filter "label=net.cylo.recreate-regression=$(basename "${scenario_dir[$scenario]}")" \
+            | xargs -r docker stop -t 60 >/dev/null || true
     done
 }
 run_batch same-image from-base from-deployed

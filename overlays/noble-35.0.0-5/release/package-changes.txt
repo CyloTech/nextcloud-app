@@ -34,6 +34,14 @@
 - libsys-hostname-long-perl 1.5-3
 - libuchardet0:amd64 0.0.8-1build1
 - man-db 2.12.0-4build2
+~ mysql-client 8.4.11-1ubuntu24.04 -> 8.4.13-1ubuntu24.04
+~ mysql-common 8.4.11-1ubuntu24.04 -> 8.4.13-1ubuntu24.04
+~ mysql-community-client 8.4.11-1ubuntu24.04 -> 8.4.13-1ubuntu24.04
+~ mysql-community-client-core 8.4.11-1ubuntu24.04 -> 8.4.13-1ubuntu24.04
+~ mysql-community-client-plugins 8.4.11-1ubuntu24.04 -> 8.4.13-1ubuntu24.04
+~ mysql-community-server 8.4.11-1ubuntu24.04 -> 8.4.13-1ubuntu24.04
+~ mysql-community-server-core 8.4.11-1ubuntu24.04 -> 8.4.13-1ubuntu24.04
+~ mysql-server 8.4.11-1ubuntu24.04 -> 8.4.13-1ubuntu24.04
 - php 2:8.3+93ubuntu2
 - php-all-dev 2:93ubuntu2
 - php-amqp 1.11.0-5ubuntu1

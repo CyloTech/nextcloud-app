@@ -9,7 +9,8 @@
 #   no other package, and no other PHP version, can come from it. php8.3 and
 #   Ubuntu's php-* metapackages are purged.
 # - The base mysql.sh no longer runs apt when a container is created, so a
-#   container runs exactly the packages that were tested.
+#   container runs exactly the packages that were tested. It used to upgrade
+#   MySQL there; the MySQL 8.4 packages are upgraded here instead.
 # - Redis listens only on /run/redis/redis.sock (runit service
 #   /etc/service/redis, user appbox). 30_installer.sh adds memcache.locking,
 #   memcache.distributed and redis to config.php when they are missing, and
@@ -30,6 +31,13 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # release-gate.sh reads this line.
 ARG PHP84_MIN_VERSION=8.4.27-1+ubuntu24.04.1+deb.sury.org+1
 LABEL net.cylo.php-min-version="${PHP84_MIN_VERSION}"
+
+# The current MySQL 8.4 LTS release from repo.mysql.com. Containers of the
+# earlier 35.0.0 images upgrade MySQL when they are created, so this image
+# must not ship an older one. Every installed MySQL 8.4 package must end up at
+# one version that is at least this one.
+ARG MYSQL84_MIN_VERSION=8.4.13-1ubuntu24.04
+LABEL net.cylo.mysql-min-version="${MYSQL84_MIN_VERSION}"
 
 # Edit the base files only when they are the ones these edits were written
 # against (35.0.0-4).
@@ -69,6 +77,15 @@ RUN --mount=type=bind,source=.,target=/mnt/overlay \
         php8.4-oauth php8.4-ps php8.4-uploadprogress php8.4-uuid \
         php8.4-xmlrpc php8.4-yaml php8.4-ssh2 php8.4-raphf php8.4-http \
         redis-server; \
+    mysql_packages=$(dpkg-query -W -f='${db:Status-Abbrev}|${binary:Package}|${Version}\n' \
+        | awk -F'|' '$1 ~ /^ii/ && $2 ~ /^mysql-/ && $3 ~ /^8\.4\./ {print $2}'); \
+    test -n "$mysql_packages"; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --only-upgrade \
+        -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold $mysql_packages; \
+    mysql_versions=$(dpkg-query -W -f='${db:Status-Abbrev}|${binary:Package}|${Version}\n' \
+        | awk -F'|' '$1 ~ /^ii/ && $2 ~ /^mysql-/ && $3 ~ /^8\.4\./ {print $3}' | sort -u); \
+    [ "$(printf '%s\n' "$mysql_versions" | wc -l)" -eq 1 ]; \
+    dpkg --compare-versions "$mysql_versions" ge "$MYSQL84_MIN_VERSION"; \
     DEBIAN_FRONTEND=noninteractive apt-get purge -y 'php8.3*'; \
     DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y; \
     rm -rf /etc/php/8.3 /usr/lib/php/8.3 /usr/lib/php/20230831; \
