@@ -88,6 +88,8 @@ cleanup() {
     for dir in "${scenario_dirs[@]}"; do
         [ ! -d "$dir" ] || "$recreate_test" "$dir" cleanup "$base_ref" \
             || echo "Remove $dir and its container by hand" >&2
+        docker ps -aq --filter "label=net.cylo.recreate-regression=$(basename "$dir")" \
+            | xargs -r docker rm -f >/dev/null 2>&1 || true
     done
     rm -rf "$work"
 }
@@ -474,20 +476,28 @@ scenario_mysql80_kill() {
         && "$mysql80_test" "$mysql80_kill_dir" check-84 "$image_ref"
 }
 
+# Each MySQL 8.4 server takes about 14,000 of the host's asynchronous I/O
+# contexts (fs.aio-max-nr is 65536 on builder1), so at most three scenarios
+# run at a time.
 scenarios="same-image from-base from-deployed mysql80 mysql80-kill"
-declare -A scenario_pid
-for scenario in $scenarios; do
-    "scenario_${scenario//-/_}" > "$work/scenario-$scenario.log" 2>&1 &
-    scenario_pid[$scenario]=$!
-done
 failed=
-for scenario in $scenarios; do
-    status=0
-    wait "${scenario_pid[$scenario]}" || status=$?
-    echo "--- $scenario (exit $status)"
-    grep -vE '^ *- |^[[:space:]]*$|^ +[0-9]+ \[' "$work/scenario-$scenario.log" | tail -n 60
-    [ "$status" -eq 0 ] || failed="$failed $scenario"
-done
+run_batch() {
+    local scenario status
+    declare -A scenario_pid
+    for scenario in "$@"; do
+        "scenario_${scenario//-/_}" > "$work/scenario-$scenario.log" 2>&1 &
+        scenario_pid[$scenario]=$!
+    done
+    for scenario in "$@"; do
+        status=0
+        wait "${scenario_pid[$scenario]}" || status=$?
+        echo "--- $scenario (exit $status)"
+        grep -vE '^ *- |^[[:space:]]*$|^ +[0-9]+ \[' "$work/scenario-$scenario.log" | tail -n 60
+        [ "$status" -eq 0 ] || failed="$failed $scenario"
+    done
+}
+run_batch same-image from-base from-deployed
+run_batch mysql80 mysql80-kill
 [ -z "$failed" ] || fail "update tests failed:$failed"
 echo "update tests passed: $scenarios"
 

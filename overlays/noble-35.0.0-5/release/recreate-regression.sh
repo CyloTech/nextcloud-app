@@ -118,7 +118,11 @@ occ() {
 }
 
 start_container() {
+    # The label lets the release gate remove the container even when the work
+    # directory has gone (builder1 deletes /dev/shm files when appbox's last
+    # login session ends).
     docker run -d --name "$name" --hostname "$name" --init \
+        --label "net.cylo.recreate-regression=$(basename "$work")" \
         --memory 6g --memory-swap 6g \
         -e "HOSTNAME=$name" -e APP_APEX_CALLBACK=false -e INSTANCE_ID=0 \
         -e PUID=1000 -e PGID=1000 \
