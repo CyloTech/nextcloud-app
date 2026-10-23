@@ -404,17 +404,18 @@ docker rm -f "$test_name" >/dev/null
 echo "restart: healthy, setup checks pass"
 
 echo "== Update tests on Appbox host directories"
+# Created in this shell (not in a $(...) subshell) so that cleanup sees them.
 new_dir() {
     local dir
     dir=$(mktemp -d /dev/shm/nextcloud-recreate.XXXXXX)
     scenario_dirs+=("$dir")
-    echo "$dir"
+    printf -v "$1" '%s' "$dir"
 }
-same_dir=$(new_dir)
-base_dir=$(new_dir)
-deployed_dir=$(new_dir)
-mysql80_dir=$(new_dir)
-mysql80_kill_dir=$(new_dir)
+new_dir same_dir
+new_dir base_dir
+new_dir deployed_dir
+new_dir mysql80_dir
+new_dir mysql80_kill_dir
 
 setupchecks_of() {
     docker exec "$(cat "$1/name")" su -s /bin/sh -c "cd /home/appbox/public_html && php occ setupchecks --output=json" appbox || true
